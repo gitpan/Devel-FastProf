@@ -6,4 +6,5 @@ ppport.h
 README
 t/Devel-FastProf.t
 lib/Devel/FastProf.pm
+bin/fprofpp
 META.yml                                 Module meta-data (added by MakeMaker)

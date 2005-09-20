@@ -1,7 +1,7 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.01';
+    $VERSION = '0.02';
 }
 
 package DB;

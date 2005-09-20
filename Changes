@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::FastProf.
 
+0.02  20 Sep 2005
+	- fprofpp added to MANIFEST
+
 0.01  Sat Sep 10 21:08:30 2005
 	- original version; created by h2xs 1.23 with options
 		-An Devel::FastProf
