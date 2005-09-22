@@ -1,7 +1,7 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.02';
+    $VERSION = '0.03';
 }
 
 package DB;
@@ -79,6 +79,11 @@ Devel::FastProf - "fast" perl per-line profiler
   $ perl -d:FastProf my_script.pl
   $ fprofpp -t 10
 
+=head1 ABSTRACT
+
+Devel::FastProf tells you how much time has been spent on every line
+of your program.
+
 =head1 DESCRIPTION
 
 C<Devel::FastProf> is a perl per-line profiler. What that means is
@@ -147,6 +152,9 @@ I have only tested it on Linux actually.
 The code of subroutines defined inside C<eval "..."> constructions
 that do not include any other code will not be available on the
 reports. This is caused by a limitation on the perl interpreter.
+
+Option -g is buggy, it only works when all the modules are loaded in
+the original process.
 
 If you find any bug, please, send me an e-mail to
 L<sfandino@yahoo.com>.

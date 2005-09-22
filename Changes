@@ -1,5 +1,8 @@
 Revision history for Perl extension Devel::FastProf.
 
+0.03  22 Sep 2005
+	- add ABSTRACT section to docs.
+
 0.02  20 Sep 2005
 	- fprofpp added to MANIFEST
 
