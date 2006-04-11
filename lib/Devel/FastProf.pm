@@ -1,7 +1,7 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.04';
+    $VERSION = '0.05';
 }
 
 package DB;
@@ -9,18 +9,7 @@ package DB;
 BEGIN { $^P=0x0 }
 
 use Time::HiRes ();
-
 sub sub;
-sub _DB;
-sub _DB_wrapper { &_DB }
-
-# work around perl bug #37138
-if ( $] >= 5.008008) {
-    *DB = \&_DB;
-}
-else {
-    *DB = \&_DB_wrapper;
-}
 
 BEGIN {
 
@@ -156,8 +145,10 @@ reports. This is caused by a limitation on the perl interpreter.
 Option -g is buggy, it only works when all the modules are loaded in
 the original process.
 
+perl 5.8.8 required!
+
 If you find any bug, please, send me an e-mail to
-L<sfandino@yahoo.com>.
+L<sfandino@yahoo.com> or report it via the CPAN RT system.
 
 =head1 SEE ALSO
 
@@ -166,7 +157,8 @@ L<perldebug> and L<perldebguts>.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2005 by Salvador FandiE<ntilde>o E<lt>sfandino@yahoo.comE<gt>.
+Copyright (C) 2005-2006 by Salvador FandiE<ntilde>o
+E<lt>sfandino@yahoo.comE<gt>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.7 or,

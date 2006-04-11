@@ -172,7 +172,7 @@ for my $key (@keys) {
 	$spid = defined $ppid ? " [$pid $ppid]" : " [$pid]"
     }
 
-    printf("%s:%d%s %.3f %d: %s\n",
+    printf("%s:%d%s %.5f %d: %s\n",
 	   # $fid,
 	   $fn,
 	   $line,

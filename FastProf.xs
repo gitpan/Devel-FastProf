@@ -37,33 +37,33 @@ _putiv(pTHX_ I32 i32) {
     U32 n = (U32)i32;
     n-=128;
     if (n < 16384) {
-	putc((n>>8) | 0x80, out);
-	putc(n & 0xff, out);
+        putc((n>>8) | 0x80, out);
+        putc(n & 0xff, out);
     }
     else {
-	n -= 16384;
-	if (n < 2097152) {
-	    putc((n>>16) | 0xc0, out);
-	    putc((n>>8) & 0xff, out);
-	    putc(n & 0xff, out);
-	}
-	else {
-	    n -= 2097152;
-	    if (n < 268435456) {
-		putc((n>>24) | 0xe0, out);
-		putc((n>>16) & 0xff, out);
-		putc((n>>8) & 0xff, out);
-		putc(n & 0xff, out);
-	    }
-	    else {
-		n -= 268435456;
-		putc(0xf0, out);
-		putc((n>>24), out);
-		putc((n>>16) & 0xff, out);
-		putc((n>>8) & 0xff, out);
-		putc(n & 0xff, out);
-	    }
-	}
+        n -= 16384;
+        if (n < 2097152) {
+            putc((n>>16) | 0xc0, out);
+            putc((n>>8) & 0xff, out);
+            putc(n & 0xff, out);
+        }
+        else {
+            n -= 2097152;
+            if (n < 268435456) {
+                putc((n>>24) | 0xe0, out);
+                putc((n>>16) & 0xff, out);
+                putc((n>>8) & 0xff, out);
+                putc(n & 0xff, out);
+            }
+            else {
+                n -= 268435456;
+                putc(0xf0, out);
+                putc((n>>24), out);
+                putc((n>>16) & 0xff, out);
+                putc((n>>8) & 0xff, out);
+                putc(n & 0xff, out);
+            }
+        }
     }
 }
 
@@ -73,16 +73,16 @@ putav(pTHX_ AV *av) {
     UV i;
     putiv(nl);
     for (i=0; i<nl; i++) {
-	SV **psv = av_fetch(av, i, 0);
-	STRLEN ll;
-	char *data;
-	if (psv) {
-	    data = SvPV(*psv, ll);
-	    putpvn(data, ll);
-	}
-	else {
-	    put0();
-	}
+        SV **psv = av_fetch(av, i, 0);
+        STRLEN ll;
+        char *data;
+        if (psv) {
+            data = SvPV(*psv, ll);
+            putpvn(data, ll);
+        }
+        else {
+            put0();
+        }
     }
 }
 
@@ -277,88 +277,90 @@ flock_and_header(pTHX) {
 MODULE = Devel::FastProf		PACKAGE = DB
 PROTOTYPES: DISABLE
 
-void _DB(...)
+void DB(...)
     PPCODE:
     {
-	IV ticks;
-	if (usecputime) {
-	    struct tms buf;
-	    times(&buf);
-	    ticks = buf.tms_utime - old_tms.tms_utime + buf.tms_stime - old_tms.tms_stime;
-	}
-	else {
-	    UV time[2];
-	    (*u2time)(aTHX_ time);
-	    ticks =  (time[0] - old_time[0]) * 15625 + (time[1] >> 6) - (old_time[1] >> 6);
-	}
-	if (out) { /* out should never be NULL anyway */
-	    PERL_CONTEXT *cx = cxstack + cxstack_ix;
-	    
-	    if (canfork)
-		flock_and_header(aTHX);
-
-	    putiv(get_file_id(aTHX_ OutCopFILE(cx->blk_oldcop)));
-	    putiv(CopLINE(cx->blk_oldcop));
-	    
-	    if (ticks < 0) ticks = 0;
-	    putiv(ticks);
-
-	    if (canfork) {
-		fflush(out);
-		flock(fileno(out), LOCK_UN);
-	    }
-	}
-	if (usecputime) {
-	    times(&old_tms);
-	}
-	else {
-	    (*u2time)(aTHX_ old_time); 
-	}
+        IV ticks;
+        if (usecputime) {
+            struct tms buf;
+            times(&buf);
+            ticks = buf.tms_utime - old_tms.tms_utime + buf.tms_stime - old_tms.tms_stime;
+        }
+        else {
+            UV time[2];
+            (*u2time)(aTHX_ time);
+            if (time[0] < old_time[0] + 2000) {
+                ticks = (time[0] - old_time[0]) * 1000 + time[1] - old_time[1];
+            }
+            else {
+                ticks = 2000000000;
+            }
+        }
+        if (out) { /* out should never be NULL anyway */
+            if (canfork)
+                flock_and_header(aTHX);
+            
+            putiv(get_file_id(aTHX_ OutCopFILE(PL_curcop)));
+            putiv(CopLINE(PL_curcop));
+            
+            if (ticks < 0) ticks = 0;
+            putiv(ticks);
+            
+            if (canfork) {
+                fflush(out);
+                flock(fileno(out), LOCK_UN);
+            }
+        }
+        if (usecputime) {
+            times(&old_tms);
+        }
+        else {
+            (*u2time)(aTHX_ old_time); 
+        }
     }
-
 
 void _finish()
 PPCODE:
     {
-	if (out) {
-	    if (canfork) {
-		flock_and_header(aTHX);
-		fflush(out);
-		flock(fileno(out), LOCK_UN);
-	    }
-	    fclose(out);
-	    out = NULL;
-	}
+        if (out) {
+            if (canfork) {
+                flock_and_header(aTHX);
+                fflush(out);
+                flock(fileno(out), LOCK_UN);
+            }
+            fclose(out);
+            out = NULL;
+        }
     }
 
 
 void _init(char *_outname, int _usecputime, int _canfork)
 PPCODE:
     {
-	out = fopen(_outname, "wb");
-	if (!out) croak("unable to open file %s for writing", _outname);
+        out = fopen(_outname, "wb");
+        if (!out) croak("unable to open file %s for writing", _outname);
+        
+        putmark(3);
+        if (_usecputime) {
+            usecputime = 1;
+            putiv(sysconf(_SC_CLK_TCK));
+            times(&old_tms);
+        }
+        else {
+            SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
+            usecputime = 0;
+            if (!svp || !SvIOK(*svp)) croak("Time::HiRes is required");
+            u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
+            putiv(1000000);
+            (*u2time)(aTHX_ old_time);
+        }
 
-	putmark(3);
-	if (_usecputime) {
-	    usecputime = 1;
-	    putiv(sysconf(_SC_CLK_TCK));
-	    times(&old_tms);
-	}
-	else {
-	    usecputime = 0;
-	    SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
-	    if (!svp || !SvIOK(*svp)) croak("Time::HiRes is required");
-	    u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
-	    putiv(15625);
-	    (*u2time)(aTHX_ old_time);
-	}
+        if (_canfork) {
+            canfork = 1;
+            outname = strdup(_outname);
+        }
 
-	if (_canfork) {
-	    canfork = 1;
-	    outname = strdup(_outname);
-	}
-
-	file_id = get_hv("DB::file_id", TRUE);
+        file_id = get_hv("DB::file_id", TRUE);
     }
 
 
@@ -367,131 +369,120 @@ MODULE = Devel::FastProf		PACKAGE = Devel::FastProf::Reader
 void _read_file(char *infn)
 PPCODE:
     {
-	HV *ticks = get_hv("Devel::FastProf::Reader::TICKS", TRUE);
-	HV *count = get_hv("Devel::FastProf::Reader::COUNT", TRUE);
-	AV *fn = get_av("Devel::FastProf::Reader::FN", TRUE);
-	AV *src = get_av("Devel::FastProf::Reader::SRC", TRUE);
-	HV *fpidmap = get_hv("Devel::FastProf::Reader::FPIDMAP", TRUE);
-	HV *ppid = get_hv("Devel::FastProf::Reader::PPID", TRUE);
-	
-	float inv_ticks_per_second = 1.0;
-	IV lfid, lline;
-	int not_first = 0;
-	IV pid = 0;
-
-	SV *key = sv_2mortal(newSV(30));
-	char *k;
-	STRLEN l;
-	SV **ent;
-
-
-	HV *pidlfid = (HV*)sv_2mortal((SV*)newHV());
-	HV *pidlline = (HV*)sv_2mortal((SV*)newHV());
-
-	FILE *in = fopen(infn, "rb");
-	if (!in) croak("unable to open %s for reading", infn);
-
-	while (fneof(in)) {
-	    IV mark = fgetmark(aTHX_ in);
-	    switch (mark) {
-	    case 0: /* line execution timestamp */
-	    {
-		IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
-		IV line = fgetiv(aTHX_ in);
-		IV delta = fgetiv(aTHX_ in);
-		
-		if (not_first) {
-		    SV **tsv, **csv;
-
-		    /* SV *key = newSVpvf("%d:%d", lfid, lline); */
-		    sv_setpvf(key, "%d:%d", lfid, lline);
-		    k = SvPV(key, l);
-		    
-		    tsv = hv_fetch(ticks, k, l, TRUE);
-		    csv = hv_fetch(count, k, l, TRUE);
-		    if (tsv && csv) {
-			float old = SvOK(*tsv) ? SvNV(*tsv) : 0.0;
-			/* printf("delta: %d\n", delta); */
-			sv_setnv(*tsv, old + delta * inv_ticks_per_second);
-			sv_inc(*csv);
-		    }
-		    else {
-			croak("internal error");
-		    }
-		}
-		else {
-		    not_first = 1;
-		}
-		lfid = fid;
-		lline = line;
-		break;
-	    }
-	    case 1: /* filename comming */
-	    {
-		IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
-		SV *fsv = fgetpv(aTHX_ in);
-		av_store(fn, fid, fsv);
-		break;
-	    }
-	    case 2: /* src comming */
-	    {
-		IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
-		AV *lines = fgetav(aTHX_ in);
-		SV *ref = newRV_noinc((SV*)lines);
-		av_store(src, fid, ref);
-		break;
-	    }
-	    case 3: /* ticks per second */
-	    {
-		IV tps = fgetiv(aTHX_ in);
-		if (!tps)
-		    croak("bad parameter value: ticks_per_second = 0");
-
-		inv_ticks_per_second = 1.0 / tps;
-		break;
-	    }
-	    case 4:
-	    {
-		croak("obsolete file format");
-	    }
-	    case 5:
-	    {
-		if (not_first) {
-		    sv_setiv(key, pid);
-		    k = SvPV(key, l);
-		    ent = hv_fetch(pidlfid, k, l, TRUE);
-		    sv_setiv(*ent, lfid);
-		    ent = hv_fetch(pidlline, k, l, TRUE);
-		    sv_setiv(*ent, lline);
-		}
-
-		pid = fgetiv(aTHX_ in);
-
-		sv_setiv(key, pid);
-		k = SvPV(key, l);
-		ent = hv_fetch(pidlfid, k, l, 0);
-		if (ent) {
-		    not_first = 1;
-		    lfid = SvIV(*ent);
-		    ent = hv_fetch(pidlline, k, l, TRUE);
-		    lline = SvIV(*ent);
-		}
-		else {
-		    not_first = 0;
-		}
-
-		break;
-	    }
-	    case 6:
-	    {
-		sv_setiv(key, pid);
-		k = SvPV(key, l);
-		ent = hv_fetch(ppid, k, l, TRUE);
-		sv_setiv(*ent, fgetiv(aTHX_ in));
-		break;
-	    }
-	    default:
-		croak("bad file format");
-	    }
-	}
+        HV *ticks = get_hv("Devel::FastProf::Reader::TICKS", TRUE);
+        HV *count = get_hv("Devel::FastProf::Reader::COUNT", TRUE);
+        AV *fn = get_av("Devel::FastProf::Reader::FN", TRUE);
+        AV *src = get_av("Devel::FastProf::Reader::SRC", TRUE);
+        HV *fpidmap = get_hv("Devel::FastProf::Reader::FPIDMAP", TRUE);
+        HV *ppid = get_hv("Devel::FastProf::Reader::PPID", TRUE);
+        float inv_ticks_per_second = 1.0;
+        IV lfid, lline;
+        int not_first = 0;
+        IV pid = 0;
+        SV *key = sv_2mortal(newSV(30));
+        char *k;
+        STRLEN l;
+        SV **ent;
+        HV *pidlfid = (HV*)sv_2mortal((SV*)newHV());
+        HV *pidlline = (HV*)sv_2mortal((SV*)newHV());
+        FILE *in = fopen(infn, "rb");
+        if (!in) croak("unable to open %s for reading", infn);
+        while (fneof(in)) {
+            IV mark = fgetmark(aTHX_ in);
+            switch (mark) {
+            case 0: /* line execution timestamp */
+            {
+                IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
+                IV line = fgetiv(aTHX_ in);
+                IV delta = fgetiv(aTHX_ in);
+                /* fprintf(stderr, "fid: %d, line: %d, delta: %d\n", fid, line, delta); */
+                if (not_first) {
+                    SV **tsv, **csv;
+                    /* SV *key = newSVpvf("%d:%d", lfid, lline); */
+                    sv_setpvf(key, "%d:%d", lfid, lline);
+                    k = SvPV(key, l);
+                    tsv = hv_fetch(ticks, k, l, TRUE);
+                    csv = hv_fetch(count, k, l, TRUE);
+                    if (tsv && csv) {
+                        float old = SvOK(*tsv) ? SvNV(*tsv) : 0.0;
+                        /* printf("delta: %d\n", delta); */
+                        sv_setnv(*tsv, old + delta * inv_ticks_per_second);
+                        sv_inc(*csv);
+                    }
+                    else {
+                        croak("internal error");
+                    }
+                }
+                else {
+                    not_first = 1;
+                }
+                lfid = fid;
+                lline = line;
+                break;
+            }
+            case 1: /* filename comming */
+            {
+                IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
+                SV *fsv = fgetpv(aTHX_ in);
+                av_store(fn, fid, fsv);
+                break;
+            }
+            case 2: /* src comming */
+            {
+                IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
+                AV *lines = fgetav(aTHX_ in);
+                SV *ref = newRV_noinc((SV*)lines);
+                av_store(src, fid, ref);
+                break;
+            }
+            case 3: /* ticks per second */
+            {
+                IV tps = fgetiv(aTHX_ in);
+                if (!tps)
+                    croak("bad parameter value: ticks_per_second = 0");
+                
+                inv_ticks_per_second = 1.0 / tps;
+                break;
+            }
+            case 4:
+            {
+                croak("obsolete file format");
+            }
+            case 5:
+            {
+                if (not_first) {
+                    sv_setiv(key, pid);
+                    k = SvPV(key, l);
+                    ent = hv_fetch(pidlfid, k, l, TRUE);
+                    sv_setiv(*ent, lfid);
+                    ent = hv_fetch(pidlline, k, l, TRUE);
+                    sv_setiv(*ent, lline);
+                }            
+                pid = fgetiv(aTHX_ in);
+                sv_setiv(key, pid);
+                k = SvPV(key, l);
+                ent = hv_fetch(pidlfid, k, l, 0);
+                if (ent) {
+                    not_first = 1;
+                    lfid = SvIV(*ent);
+                    ent = hv_fetch(pidlline, k, l, TRUE);
+                    lline = SvIV(*ent);
+                }
+                else {
+                    not_first = 0;
+                }
+                break;
+            }
+            case 6:
+            {
+                sv_setiv(key, pid);
+                k = SvPV(key, l);
+                ent = hv_fetch(ppid, k, l, TRUE);
+                sv_setiv(*ent, fgetiv(aTHX_ in));
+                break;
+            }
+            default:
+                croak("bad file format");
+            }
+        }
     }
