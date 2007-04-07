@@ -25,13 +25,17 @@ static struct tms old_tms;
 static int usecputime = 1;
 static int canfork = 0;
 
-#define putiv(iv) if ((iv) < 128) { putc((iv), out); } else { _putiv(aTHX_ (iv)); }
 #define putmark(mark) putc(-(mark), out)
-#define putpvn(str, len) { putiv((len)); fwrite((str), 1, (len), out); }
+#define putpvn(str, len) { putiv(aTHX_ (len)); fwrite((str), 1, (len), out); }
 #define putpv(str) { STRLEN len = strlen((str)); putpvn((str), len); }
 #define put0() putc(0, (out))
 
+#if !defined(OutCopFILE)
+#define OutCopFILE CopFILE
+#endif
+
 /* some kind of huffman encoding for numbers */
+
 static void
 _putiv(pTHX_ I32 i32) {
     U32 n = (U32)i32;
@@ -68,10 +72,18 @@ _putiv(pTHX_ I32 i32) {
 }
 
 static void
+putiv(pTHX_ I32 i32) {
+    if ((i32) < 128)
+        putc((i32), out);
+    else 
+        _putiv(aTHX_ (i32));
+}
+
+static void
 putav(pTHX_ AV *av) {
     UV nl = av_len(av)+1;
     UV i;
-    putiv(nl);
+    putiv(aTHX_ nl);
     for (i=0; i<nl; i++) {
         SV **psv = av_fetch(av, i, 0);
         STRLEN ll;
@@ -209,7 +221,7 @@ get_file_id(pTHX_ char *fn) {
     ++last_file_id;
 	
     putmark(1);
-    putiv(last_file_id);
+    putiv(aTHX_ last_file_id);
     putpvn(fn, fnl);
 	
     sv_setiv(*pe, last_file_id);
@@ -221,7 +233,7 @@ get_file_id(pTHX_ char *fn) {
 	AV *lines = get_file_src(aTHX_ fn);
 	if (lines) {
 	    putmark(2);
-	    putiv(last_file_id);
+	    putiv(aTHX_ last_file_id);
 	    putav(aTHX_ lines);
 	}
     }
@@ -257,10 +269,10 @@ flock_and_header(pTHX) {
 	fseek(out, 0, SEEK_END);
 
 	putmark(5);
-	putiv(pid);
+	putiv(aTHX_ pid);
 
 	putmark(6);
-	putiv(lpid);
+	putiv(aTHX_ lpid);
 
     }
     else {
@@ -268,7 +280,7 @@ flock_and_header(pTHX) {
 	fseek(out, 0, SEEK_END);
 
 	putmark(5);
-	putiv(pid);
+	putiv(aTHX_ pid);
     }
     lpid = pid;
 }
@@ -278,7 +290,7 @@ MODULE = Devel::FastProf		PACKAGE = DB
 PROTOTYPES: DISABLE
 
 void DB(...)
-    PPCODE:
+PPCODE:
     {
         IV ticks;
         if (usecputime) {
@@ -297,14 +309,20 @@ void DB(...)
             }
         }
         if (out) { /* out should never be NULL anyway */
+#if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
+            PERL_CONTEXT *cx = cxstack + cxstack_ix;
+#endif
             if (canfork)
                 flock_and_header(aTHX);
-            
-            putiv(get_file_id(aTHX_ OutCopFILE(PL_curcop)));
-            putiv(CopLINE(PL_curcop));
-            
+#if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
+            putiv(aTHX_ get_file_id(aTHX_ OutCopFILE(cx->blk_oldcop)));
+            putiv(aTHX_ CopLINE(cx->blk_oldcop));
+#else
+            putiv(aTHX_ get_file_id(aTHX_ OutCopFILE(PL_curcop)));
+            putiv(aTHX_ CopLINE(PL_curcop));
+#endif
             if (ticks < 0) ticks = 0;
-            putiv(ticks);
+            putiv(aTHX_ ticks);
             
             if (canfork) {
                 fflush(out);
@@ -343,7 +361,7 @@ PPCODE:
         putmark(3);
         if (_usecputime) {
             usecputime = 1;
-            putiv(sysconf(_SC_CLK_TCK));
+            putiv(aTHX_ sysconf(_SC_CLK_TCK));
             times(&old_tms);
         }
         else {
@@ -351,7 +369,7 @@ PPCODE:
             usecputime = 0;
             if (!svp || !SvIOK(*svp)) croak("Time::HiRes is required");
             u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
-            putiv(1000000);
+            putiv(aTHX_ 1000000);
             (*u2time)(aTHX_ old_time);
         }
 

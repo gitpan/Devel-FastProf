@@ -1,7 +1,7 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.05';
+    $VERSION = '0.06';
 }
 
 package DB;
@@ -15,6 +15,12 @@ BEGIN {
 
     require XSLoader;
     XSLoader::load('Devel::FastProf', $Devel::FastProf::VERSION);
+
+    if ($] < 5.008008) {
+        local $^W = 0;
+        *_DB = \&DB;
+        *DB = sub { &_DB }
+    }
 
     my %config = qw( filename fastprof.out
 		     usecputime 0
@@ -145,7 +151,7 @@ reports. This is caused by a limitation on the perl interpreter.
 Option -g is buggy, it only works when all the modules are loaded in
 the original process.
 
-perl 5.8.8 required!
+perl 5.8 required!
 
 If you find any bug, please, send me an e-mail to
 L<sfandino@yahoo.com> or report it via the CPAN RT system.
@@ -157,7 +163,7 @@ L<perldebug> and L<perldebguts>.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2005-2006 by Salvador FandiE<ntilde>o
+Copyright (C) 2005-2007 by Salvador FandiE<ntilde>o
 E<lt>sfandino@yahoo.comE<gt>.
 
 This library is free software; you can redistribute it and/or modify
