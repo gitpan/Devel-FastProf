@@ -1,7 +1,7 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.06';
+    $VERSION = '0.07';
 }
 
 package DB;
@@ -150,8 +150,6 @@ reports. This is caused by a limitation on the perl interpreter.
 
 Option -g is buggy, it only works when all the modules are loaded in
 the original process.
-
-perl 5.8 required!
 
 If you find any bug, please, send me an e-mail to
 L<sfandino@yahoo.com> or report it via the CPAN RT system.
