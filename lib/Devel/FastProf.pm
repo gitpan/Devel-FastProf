@@ -1,15 +1,16 @@
 package Devel::FastProf;
 
 BEGIN {
-    $VERSION = '0.07';
+    $VERSION = '0.08';
 }
 
 package DB;
 
 BEGIN { $^P=0x0 }
 
-use Time::HiRes ();
 sub sub;
+
+BEGIN { eval "require Time::HiRes" }
 
 BEGIN {
 
@@ -19,7 +20,7 @@ BEGIN {
     if ($] < 5.008008) {
         local $^W = 0;
         *_DB = \&DB;
-        *DB = sub { &_DB }
+        *DB = sub { goto &_DB }
     }
 
     my %config = qw( filename fastprof.out
@@ -56,7 +57,7 @@ BEGIN {
 }
 
 END {
-    { package main; }
+    { package main; 1 }
     _finish();
 }
 
@@ -91,7 +92,7 @@ important limitation: it was terribly slow, around 50 times slower
 than the profiled script being run out of the profiler.
 
 So, I rewrote it from scratch in C, and the result is
-C<Devel::FastProf>, that runs only between 5 and 8 times slower than
+C<Devel::FastProf>, that runs only between 3 and 5 times slower than
 under normal execution... well, maybe I should have called it
 C<Devel::NotSoSlowProf> ;-)
 
@@ -142,7 +143,7 @@ This is an example of how to set those options:
 
 No Windows! No threads!
 
-I have only tested it on Linux actually.
+Only tested on Linux. It is know not to work under Solaris.
 
 The code of subroutines defined inside C<eval "..."> constructions
 that do not include any other code will not be available on the
@@ -150,6 +151,9 @@ reports. This is caused by a limitation on the perl interpreter.
 
 Option -g is buggy, it only works when all the modules are loaded in
 the original process.
+
+Perl 5.8.8 or later is recomended. Older versions have a bug that
+cause this profiler to be slower.
 
 If you find any bug, please, send me an e-mail to
 L<sfandino@yahoo.com> or report it via the CPAN RT system.

@@ -1,6 +1,13 @@
 Revision history for Perl extension Devel::FastProf.
 
-0.07  8 Apr, 2008
+0.08  9 Apr, 2007
+        - count last executed line (bug reported by Cory Bennett)
+        - optimize file format, dump file id only when changed
+        - optimization for older perls (suggested by Tim Bunce)
+        - clean up Makefile.PL
+        - use gettimeofday instead of Time::HiRes when available
+        
+0.07  8 Apr, 2007
         - mayor bug in time accounting functions corrected
         - add header with module version info to output file
         - negative IVs were incorrectly serialized

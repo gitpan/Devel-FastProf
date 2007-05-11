@@ -3,10 +3,13 @@
 use warnings;
 use strict;
 
+our $VERSION = '0.08';
+
 use Devel::FastProf::Reader;
 use Sort::Key qw(rikeysort rnkeysort);
 
 use Getopt::Std;
+$Getopt::Std::STANDARD_HELP_VERSION = 1;
 
 our ($opt_f, $opt_r, $opt_t, $opt_g, $opt_e, $opt_p, $opt_H);
 getopts("f:t:rgepH");
@@ -181,7 +184,6 @@ for my $key (@keys) {
 	   $COUNT{$key},
 	   $src);
 }
-
 
 __END__
 

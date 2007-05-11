@@ -14,16 +14,25 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static int (*u2time)(pTHX_ UV *) = 0;
-
 static FILE *out = 0;
 static char *outname;
 
-static HV *file_id;
+static HV *file_id_hv;
+
+#if defined (HAS_GETTIMEOD)
+static struct timeval old_time;
+#else
 static UV old_time[2];
+static int (*u2time)(pTHX_ UV *) = 0;
+#endif
+
 static struct tms old_tms;
 static int usecputime = 1;
 static int canfork = 0;
+
+static char *old_fn = "";
+static IV old_line = 0;
+
 
 #define putmark(mark) putc(-(mark), out)
 #define putpvn(str, len) { putiv(aTHX_ (len)); fwrite((str), 1, (len), out); }
@@ -209,22 +218,22 @@ get_file_src(pTHX_ char *fn) {
 
 static UV
 get_file_id(pTHX_ char *fn) {
-    static IV last_file_id = 0;
+    static IV file_id_generator = 0;
     SV ** pe;
     UV id;
     STRLEN fnl = strlen(fn);
 
-    pe = hv_fetch(file_id, fn, fnl, TRUE);
+    pe = hv_fetch(file_id_hv, fn, fnl, TRUE);
     if (SvOK(*pe))
 	return SvUV(*pe);
 
-    ++last_file_id;
+    ++file_id_generator;
 	
     putmark(1);
-    putiv(aTHX_ last_file_id);
+    putiv(aTHX_ file_id_generator);
     putpvn(fn, fnl);
 	
-    sv_setiv(*pe, last_file_id);
+    sv_setiv(*pe, file_id_generator);
 
     if ((fn[0] == '(' && (strncmp("eval", fn+1, 4)==0 || 
 			  strncmp("re_eval", fn+1, 7)==0 ) ) ||
@@ -233,11 +242,11 @@ get_file_id(pTHX_ char *fn) {
 	AV *lines = get_file_src(aTHX_ fn);
 	if (lines) {
 	    putmark(2);
-	    putiv(aTHX_ last_file_id);
+	    putiv(aTHX_ file_id_generator);
 	    putav(aTHX_ lines);
 	}
     }
-    return last_file_id;
+    return file_id_generator;
 }
 
 static IV
@@ -299,28 +308,46 @@ PPCODE:
             ticks = buf.tms_utime - old_tms.tms_utime + buf.tms_stime - old_tms.tms_stime;
         }
         else {
+#if defined(HAS_GETTIMEOD)
+            struct timeval time;
+            gettimeofday(&time, NULL);
+            if (time.tv_sec < old_time.tv_sec + 2000) {
+                ticks = (time.tv_sec - old_time.tv_sec) * 1000000 + time.tv_usec - old_time.tv_usec;
+            }
+#else
             UV time[2];
             (*u2time)(aTHX_ time);
             if (time[0] < old_time[0] + 2000) {
                 ticks = (time[0] - old_time[0]) * 1000000 + time[1] - old_time[1];
             }
+#endif
             else {
                 ticks = 2000000000;
             }
         }
         if (out) { /* out should never be NULL anyway */
+            IV fid;
+            IV line;
+            char *file;
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
             PERL_CONTEXT *cx = cxstack + cxstack_ix;
 #endif
             if (canfork)
                 flock_and_header(aTHX);
 #if (PERL_VERSION < 8) || ((PERL_VERSION == 8) && (PERL_SUBVERSION < 8))
-            putiv(aTHX_ get_file_id(aTHX_ OutCopFILE(cx->blk_oldcop)));
-            putiv(aTHX_ CopLINE(cx->blk_oldcop));
+            file = OutCopFILE(cx->blk_oldcop);
+            line = CopLINE(cx->blk_oldcop);
 #else
-            putiv(aTHX_ get_file_id(aTHX_ OutCopFILE(PL_curcop)));
-            putiv(aTHX_ CopLINE(PL_curcop));
+            file = OutCopFILE(PL_curcop);
+            line = CopLINE(PL_curcop);
 #endif
+            if (strcmp(file, old_fn)) {
+                fid = get_file_id(aTHX_ file);
+                putmark(7);
+                putiv(aTHX_ fid);
+                old_fn = file;
+            }
+            putiv(aTHX_ line);
             if (ticks < 0) ticks = 0;
             putiv(aTHX_ ticks);
             
@@ -333,7 +360,11 @@ PPCODE:
             times(&old_tms);
         }
         else {
-            (*u2time)(aTHX_ old_time); 
+#if defined (HAS_GETTIMEOD)
+            gettimeofday(&old_time, NULL);
+#else
+            (*u2time)(aTHX_ old_time);
+#endif
         }
     }
 
@@ -357,9 +388,7 @@ PPCODE:
     {
         out = fopen(_outname, "wb");
         if (!out) Perl_croak(aTHX_ "unable to open file %s for writing", _outname);
-        
         fwrite("D::FP-" XS_VERSION "\0\0\0\0\0\0\0", 1, 12, out);
-
         putmark(3);
         if (_usecputime) {
             usecputime = 1;
@@ -367,20 +396,24 @@ PPCODE:
             times(&old_tms);
         }
         else {
-            SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
-            usecputime = 0;
-            if (!svp || !SvIOK(*svp)) Perl_croak(aTHX_ "Time::HiRes is required");
-            u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
             putiv(aTHX_ 1000000);
+            usecputime = 0;
+#if defined (HAS_GETTIMEOD)
+            gettimeofday(&old_time, NULL);
+#else
+            {
+                SV **svp = hv_fetch(PL_modglobal, "Time::U2time", 12, 0);
+                if (!svp || !SvIOK(*svp)) Perl_croak(aTHX_ "Time::HiRes is required");
+                u2time = INT2PTR(int(*)(pTHX_ UV*), SvIV(*svp));
+            }
             (*u2time)(aTHX_ old_time);
+#endif
         }
-
         if (_canfork) {
             canfork = 1;
             outname = strdup(_outname);
         }
-
-        file_id = get_hv("DB::file_id", TRUE);
+        file_id_hv = get_hv("DB::file_id", TRUE);
     }
 
 
@@ -396,7 +429,7 @@ PPCODE:
         HV *fpidmap = get_hv("Devel::FastProf::Reader::FPIDMAP", TRUE);
         HV *ppid = get_hv("Devel::FastProf::Reader::PPID", TRUE);
         float inv_ticks_per_second = 1.0;
-        IV lfid, lline;
+        IV lfid = 0, nfid = 0, lline;
         int not_first = 0;
         IV pid = 0;
         SV *key = sv_2mortal(newSV(30));
@@ -406,6 +439,7 @@ PPCODE:
         char head[12];
         HV *pidlfid = (HV*)sv_2mortal((SV*)newHV());
         HV *pidlline = (HV*)sv_2mortal((SV*)newHV());
+
         FILE *in = fopen(infn, "rb");
         if (!in) Perl_croak(aTHX_ "unable to open %s for reading", infn);
 
@@ -417,7 +451,6 @@ PPCODE:
             switch (mark) {
             case 0: /* line execution timestamp */
             {
-                IV fid = pid ? mapid(aTHX_ fpidmap, pid, fgetiv(aTHX_ in)) : fgetiv(aTHX_ in);
                 IV line = fgetiv(aTHX_ in);
                 IV delta = fgetiv(aTHX_ in);
                 /* fprintf(stderr, "fid: %d, line: %d, delta: %d\n", fid, line, delta); */
@@ -441,7 +474,7 @@ PPCODE:
                 else {
                     not_first = 1;
                 }
-                lfid = fid;
+                lfid = nfid;
                 lline = line;
                 break;
             }
@@ -504,6 +537,14 @@ PPCODE:
                 k = SvPV(key, l);
                 ent = hv_fetch(ppid, k, l, TRUE);
                 sv_setiv(*ent, fgetiv(aTHX_ in));
+                break;
+            }
+            case 7:
+            {
+                IV fid = fgetiv(aTHX_ in);
+                nfid = pid ? mapid(aTHX_ fpidmap, pid, fid) : fid;
+                /* fprintf(stderr, "lfid: %d\n", nfid); fflush(stderr); */
+                
                 break;
             }
             default:
